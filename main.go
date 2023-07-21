@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+type MessageReturn struct {
+	Message string
+}
+
 func main() {
 
 	cep := flag.String("cep", "", "URL da primeira API")
@@ -19,8 +23,8 @@ func main() {
 	ch := make(chan string)
 	ch2 := make(chan string)
 
-	go fetchAPI(urlAPI1, timeout, ch)
-	go fetchAPI(urlAPI2, timeout, ch2)
+	go worker(ch, urlAPI1)
+	go worker(ch2, urlAPI2)
 
 	select {
 	case result := <-ch:
@@ -34,17 +38,28 @@ func main() {
 
 }
 
-func fetchAPI(url string, timeout time.Duration, ch chan<- string) {
-	client := http.Client{
-		Timeout: timeout,
+func worker(ch chan<- string, url string) {
+
+	message, err := fetchAPI(url)
+	if err != nil {
+		return
 	}
+
+	ch <- message.Message
+
+}
+
+func fetchAPI(url string) (MessageReturn, error) {
+	client := http.Client{}
 	startTime := time.Now()
 	resp, err := client.Get(url)
 	if err != nil {
-		ch <- fmt.Sprintf("Erro na requisição para %s: %s \n", url, err.Error())
-		return
+		return MessageReturn{}, err
 	}
 	defer resp.Body.Close()
 	elapsedTime := time.Since(startTime)
-	ch <- fmt.Sprintf("Tempo de resposta para %s: %s \n", url, elapsedTime)
+	message := fmt.Sprintf("Tempo de resposta para %s: %s \n", url, elapsedTime)
+	return MessageReturn{
+		message,
+	}, nil
 }
